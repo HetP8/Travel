@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Het's Holiday Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Holiday Vibe (Warm Off-White, Forest Green, Soft Grays) -->
+    <!-- Application Structure Plan: A single-page application using an accordion/toggle pattern for each destination card. Each card defaults to a clean 'summary view'. A 'Manage' button toggles the card to an 'edit view' containing the data input tables. This structure provides a clean overview with the ability to drill down into editing when necessary. -->
+    <!-- Visualization & Content Choices: Report Info: Remove tabs in edit view -> Goal: Improve usability and information visibility -> Viz/Presentation: Removed tab container and tab panel logic. All three sections (Flights, Hotels, Activities) are now always visible within the edit view. -> Interaction: None (removal of interaction) -> Justification: Directly fulfills user request to see all sections at once without clicking tabs, simplifying the editing workflow. Added vertical spacing between sections to maintain clarity. Renamed 'Activities/Transport' to 'Activities/Transport/Other'. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #3a3a3a;
+        }
+        .header-gradient {
+            background-image: linear-gradient(to bottom, white, rgba(255, 255, 255, 0.7));
+        }
+        .btn-primary { background-color: #4F7942; color: white; }
+        .btn-primary:hover { background-color: #446938; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; }
+        .btn-secondary:hover { background-color: #d1d5db; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .table-input {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            width: 100%;
+            transition: all 0.2s ease-in-out;
+        }
+        .table-input:focus {
+            background-color: white;
+            border-color: #4F7942;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(79, 121, 66, 0.2);
+        }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        
+        @media (max-width: 768px) {
+            .table-responsive {
+                display: block;
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="app-container">
+        <header class="header-gradient backdrop-blur-sm shadow-sm sticky top-0 z-20">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <h1 class="text-xl font-bold text-slate-800">Het's Holiday Planner ✈️</h1>
+                    <button onclick="openAddDestinationModal()" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">
+                        + Add Destination
+                    </button>
+                </div>
+            </div>
+        </header>
+        <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+             <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center space-x-3">
+                <label for="number-of-people" class="font-semibold text-slate-700">🧑‍🤝‍🧑 Number of People:</label>
+                <input type="number" id="number-of-people" min="1" value="4" class="table-input w-20 text-center font-bold">
+            </div>
+            <p id="no-destinations-message" class="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm">Your adventure awaits! Add a destination to start planning. 🧳</p>
+            <div id="destinations-list" class="space-y-4"></div>
+        </main>
+    </div>
+
+    <!-- Add Destination Modal -->
+    <div id="add-destination-modal" class="fixed inset-0 bg-black/30 z-50 items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6">
+                <h3 class="text-lg font-medium text-slate-900 mb-4">Add New Destination</h3>
+                <input type="text" id="new-destination-name" placeholder="e.g., Budapest, Hungary" class="w-full table-input">
+            </div>
+            <div class="px-6 py-3 bg-slate-50 flex justify-end space-x-2">
+                <button onclick="closeAddDestinationModal()" class="btn-secondary py-2 px-4 rounded-md text-sm font-semibold">Cancel</button>
+                <button onclick="addDestination()" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Templates -->
+    <template id="destination-card-template">
+        <div class="destination-card bg-white rounded-lg shadow-sm border border-slate-200 transition-shadow hover:shadow-md">
+            <div class="p-4 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800 flex items-center" data-element="name"></h3>
+                    <p class="text-sm text-slate-500" data-element="cost-summary"></p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <p class="font-bold text-xl text-green-700" data-element="total-cost"></p>
+                     <button data-action="delete" class="btn-danger p-2 rounded-md transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                     </button>
+                </div>
+            </div>
+            
+            <div class="border-t border-slate-200 p-4">
+                <div data-section="summary" class="view-section">
+                    <div data-container="summary-view"></div>
+                    <button data-action="toggle-view" class="mt-4 w-full btn-secondary font-semibold py-2 px-4 rounded-md text-sm transition-colors">✏️ Manage Details</button>
+                </div>
+
+                <div data-section="edit" class="view-section">
+                    <h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>
+                    <div class="table-responsive border rounded-lg">
+                        <table class="w-full text-sm text-left text-slate-500">
+                             <thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🛫 Departure</th><th class="px-2 py-2 font-semibold">🛬 Arrival</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead>
+                             <tbody data-container="flights-body"></tbody>
+                        </table>
+                    </div>
+                    <button data-action="add-flight" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Flight</button>
+                    
+                    <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>
+                    <div class="table-responsive border rounded-lg">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🏨 Hotel Name</th><th class="px-2 py-2 font-semibold">🗓️ Check-in</th><th class="px-2 py-2 font-semibold">🗓️ Check-out</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead>
+                            <tbody data-container="hotels-body"></tbody>
+                        </table>
+                    </div>
+                     <button data-action="add-hotel" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Hotel</button>
+                    
+                    <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>
+                    <div class="table-responsive border rounded-lg">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🎟️ Item</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead>
+                            <tbody data-container="activities-body"></tbody>
+                        </table>
+                    </div>
+                    <button data-action="add-activity" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Item</button>
+
+                    <button data-action="toggle-view" class="mt-8 w-full btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">✅ Done</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+    let database = {
+        destinations: [],
+        editingDestinationId: null,
+        numberOfPeople: 4,
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const peopleInput = document.getElementById('number-of-people');
+        loadData();
+        peopleInput.value = database.numberOfPeople;
+        peopleInput.addEventListener('change', (e) => {
+            const num = parseInt(e.target.value, 10);
+            if (num > 0) {
+                database.numberOfPeople = num;
+                saveData();
+                renderHighLevelView();
+            }
+        });
+        renderHighLevelView();
+    });
+
+    function saveData() {
+        localStorage.setItem('holidayPlannerDataV8', JSON.stringify(database));
+    }
+
+    function loadData() {
+        const data = localStorage.getItem('holidayPlannerDataV8');
+        if (data) {
+            database = JSON.parse(data);
+            if (!database.numberOfPeople) database.numberOfPeople = 4;
+        }
+    }
+    
+    function calculateTripDuration(startDateStr, endDateStr) {
+        if (!startDateStr || !endDateStr) return '';
+        const start = new Date(startDateStr);
+        const end = new Date(endDateStr);
+        if (isNaN(start) || isNaN(end) || end < start) return '';
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        const nights = diffDays;
+        const days = nights + 1;
+        return `(${nights} night${nights !== 1 ? 's' : ''}, ${days} day${days !== 1 ? 's' : ''})`;
+    }
+
+    function getMinCosts(destination) {
+        const minFlightCost = destination.flightOptions.length > 0 ? Math.min(...destination.flightOptions.map(f => f.totalCost || Infinity)) : 0;
+        const minHotelCost = destination.hotelOptions.length > 0 ? Math.min(...destination.hotelOptions.map(h => h.cost || Infinity)) : 0;
+        const minActivityCost = destination.activityOptions.length > 0 ? Math.min(...destination.activityOptions.map(a => a.totalCost || Infinity)) : 0;
+        return { 
+            minFlightCost: isFinite(minFlightCost) ? minFlightCost : 0, 
+            minHotelCost: isFinite(minHotelCost) ? minHotelCost : 0,
+            minActivityCost: isFinite(minActivityCost) ? minActivityCost : 0
+        };
+    }
+    
+    function renderHighLevelView() {
+        const listContainer = document.getElementById('destinations-list');
+        const noDestinationsMessage = document.getElementById('no-destinations-message');
+        listContainer.innerHTML = '';
+        
+        if (database.destinations.length === 0) {
+            noDestinationsMessage.style.display = 'block';
+            return;
+        }
+        noDestinationsMessage.style.display = 'none';
+
+        const sortedDestinations = [...database.destinations].map(dest => {
+            const { minFlightCost, minHotelCost, minActivityCost } = getMinCosts(dest);
+            return { ...dest, totalCost: minFlightCost + minHotelCost + minActivityCost };
+        }).sort((a, b) => a.totalCost - b.totalCost);
+
+        sortedDestinations.forEach(dest => {
+            const card = document.getElementById('destination-card-template').content.cloneNode(true);
+            const cardElement = card.firstElementChild;
+            cardElement.dataset.id = dest.id;
+
+            const { minFlightCost, minHotelCost, minActivityCost } = getMinCosts(dest);
+            const totalCost = minFlightCost + minHotelCost + minActivityCost;
+            
+            const numPeople = database.numberOfPeople;
+            const flightPp = minFlightCost > 0 ? `£${(minFlightCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '£0';
+            const hotelPp = minHotelCost > 0 ? `£${(minHotelCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '£0';
+            const activityPp = minActivityCost > 0 ? `£${(minActivityCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '£0';
+            
+            cardElement.querySelector('[data-element="name"]').textContent = dest.name;
+            cardElement.querySelector('[data-element="total-cost"]').textContent = `From £${totalCost.toLocaleString()}`;
+            cardElement.querySelector('[data-element="cost-summary"]').textContent = `✈️ ${flightPp} p/p | 🏨 ${hotelPp} p/p | 🎟️ ${activityPp} p/p`;
+            
+            cardElement.querySelector('[data-action="delete"]').addEventListener('click', () => deleteDestination(dest.id));
+            cardElement.querySelector('[data-action="add-flight"]').addEventListener('click', () => addFlightOption(dest.id));
+            cardElement.querySelector('[data-action="add-hotel"]').addEventListener('click', () => addHotelOption(dest.id));
+            cardElement.querySelector('[data-action="add-activity"]').addEventListener('click', () => addActivityOption(dest.id));
+            cardElement.querySelectorAll('[data-action="toggle-view"]').forEach(btn => btn.addEventListener('click', () => toggleEditView(dest.id)));
+            
+            renderSummaryView(dest, cardElement);
+            renderFlightOptions(dest, cardElement);
+            renderHotelOptions(dest, cardElement);
+            renderActivityOptions(dest, cardElement);
+
+            const summaryView = cardElement.querySelector('[data-section="summary"]');
+            const editView = cardElement.querySelector('[data-section="edit"]');
+            if(database.editingDestinationId === dest.id) {
+                summaryView.classList.remove('active');
+                editView.classList.add('active');
+            } else {
+                summaryView.classList.add('active');
+                editView.classList.remove('active');
+            }
+
+            listContainer.appendChild(card);
+        });
+    }
+
+    function renderSummaryView(destination, cardElement) {
+        const container = cardElement.querySelector('[data-container="summary-view"]');
+        container.innerHTML = '';
+        const numPeople = database.numberOfPeople;
+
+        let html = '<h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>';
+        if (destination.flightOptions.length > 0) {
+            html += '<div class="space-y-3">';
+            destination.flightOptions.forEach(opt => {
+                const depDate = opt.departureDate ? new Date(opt.departureDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A';
+                const arrDate = opt.arrivalDate ? new Date(opt.arrivalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A';
+                const duration = calculateTripDuration(opt.departureDate, opt.arrivalDate);
+                const depTime = opt.departureTime || '';
+                const arrTime = opt.arrivalTime || '';
+                const totalCost = opt.totalCost ? `£${opt.totalCost.toLocaleString()} total` : '';
+                const personCost = opt.totalCost ? `(£${(opt.totalCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})} p/p)` : '';
+                html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${depDate} ${depTime} → ${arrDate} ${arrTime} <span class="font-normal text-slate-500">${duration}</span></p><p class="text-green-700 font-medium">${totalCost} ${personCost}</p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`;
+            });
+            html += '</div>';
+        } else { html += '<p class="text-sm text-slate-400">No flight options added.</p>'; }
+
+        html += '<h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>';
+        if (destination.hotelOptions.length > 0) {
+            html += '<div class="space-y-3">';
+            destination.hotelOptions.forEach(opt => {
+                const checkIn = opt.checkInDate ? new Date(opt.checkInDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+                const checkOut = opt.checkOutDate ? new Date(opt.checkOutDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+                const hotelDates = checkIn && checkOut ? `${checkIn} → ${checkOut}` : '';
+                 html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${opt.name || 'Unnamed Hotel'}</p><p class="text-green-700 font-medium">${opt.cost ? `£${opt.cost.toLocaleString()}`: ''} <span class="font-normal text-slate-500">${hotelDates ? `(${hotelDates})` : ''}</span></p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`;
+            });
+             html += '</div>';
+        } else { html += '<p class="text-sm text-slate-400">No hotel options added.</p>';}
+
+        html += '<h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>';
+        if (destination.activityOptions && destination.activityOptions.length > 0) {
+            html += '<div class="space-y-3">';
+            destination.activityOptions.forEach(opt => {
+                const totalCost = opt.totalCost ? `£${opt.totalCost.toLocaleString()} total` : '';
+                const personCost = opt.totalCost ? `(£${(opt.totalCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})} p/p)` : '';
+                html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${opt.name || 'Unnamed Activity'}</p><p class="text-green-700 font-medium">${totalCost} ${personCost}</p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`;
+            });
+            html += '</div>';
+        } else { html += '<p class="text-sm text-slate-400">No items added.</p>'; }
+
+        container.innerHTML = html;
+    }
+
+    function renderFlightOptions(destination, cardElement) {
+        const body = cardElement.querySelector('[data-container="flights-body"]');
+        body.innerHTML = '';
+        destination.flightOptions.forEach(option => {
+            const row = body.insertRow();
+            const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : '';
+            row.innerHTML = `
+                <td class="p-2 align-top"><div class="space-y-1"><input type="date" value="${option.departureDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureDate', this.value)" class="table-input text-xs"><input type="time" value="${option.departureTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureTime', this.value)" class="table-input text-xs"></div></td>
+                <td class="p-2 align-top"><div class="space-y-1"><input type="date" value="${option.arrivalDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalDate', this.value)" class="table-input text-xs"><input type="time" value="${option.arrivalTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalTime', this.value)" class="table-input text-xs"></div></td>
+                <td class="p-2 align-top"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'flight')" class="table-input total-cost text-xs"></td>
+                <td class="p-2 align-top"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'flight')" class="table-input person-cost text-xs"></td>
+                <td class="p-2 align-top"><textarea onchange="updateFlightOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Airline, etc.">${option.notes || ''}</textarea></td>
+                <td class="p-2 align-top"><button onclick="deleteFlightOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
+        });
+    }
+
+    function renderHotelOptions(destination, cardElement) {
+        const body = cardElement.querySelector('[data-container="hotels-body"]');
+        body.innerHTML = '';
+        destination.hotelOptions.forEach(option => {
+            const row = body.insertRow();
+            row.innerHTML = `
+                <td class="p-2"><input type="text" value="${option.name || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></td>
+                <td class="p-2"><input type="date" value="${option.checkInDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkInDate', this.value)" class="table-input text-xs"></td>
+                <td class="p-2"><input type="date" value="${option.checkOutDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkOutDate', this.value)" class="table-input text-xs"></td>
+                <td class="p-2"><input type="number" value="${option.cost || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'cost', this.value)" class="table-input text-xs"></td>
+                <td class="p-2"><textarea onchange="updateHotelOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Booking link, etc.">${option.notes || ''}</textarea></td>
+                <td class="p-2"><button onclick="deleteHotelOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
+        });
+    }
+
+    function renderActivityOptions(destination, cardElement) {
+        const body = cardElement.querySelector('[data-container="activities-body"]');
+        body.innerHTML = '';
+        if (!destination.activityOptions) destination.activityOptions = [];
+        destination.activityOptions.forEach(option => {
+            const row = body.insertRow();
+            const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : '';
+            row.innerHTML = `
+                <td class="p-2"><input type="text" value="${option.name || ''}" onchange="updateActivityOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></td>
+                <td class="p-2 align-top"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'activity')" class="table-input total-cost text-xs"></td>
+                <td class="p-2 align-top"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'activity')" class="table-input person-cost text-xs"></td>
+                <td class="p-2 align-top"><textarea onchange="updateActivityOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Details...">${option.notes || ''}</textarea></td>
+                <td class="p-2 align-top"><button onclick="deleteActivityOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
+        });
+    }
+    
+    function toggleEditView(destId) {
+        database.editingDestinationId = (database.editingDestinationId === destId) ? null : destId;
+        renderHighLevelView();
+    }
+
+    function openAddDestinationModal() {
+        document.getElementById('add-destination-modal').style.display = 'flex';
+        document.getElementById('new-destination-name').focus();
+    }
+
+    function closeAddDestinationModal() {
+        document.getElementById('add-destination-modal').style.display = 'none';
+        document.getElementById('new-destination-name').value = '';
+    }
+
+    function addDestination() {
+        const name = document.getElementById('new-destination-name').value.trim();
+        if (!name) return;
+        database.destinations.push({ id: `dest-${Date.now()}`, name, flightOptions: [], hotelOptions: [], activityOptions: [] });
+        saveData();
+        renderHighLevelView();
+        closeAddDestinationModal();
+    }
+    
+    function deleteDestination(destinationId) {
+        if (!confirm('Are you sure you want to delete this destination and all its data?')) return;
+        database.destinations = database.destinations.filter(d => d.id !== destinationId);
+        if(database.editingDestinationId === destinationId) database.editingDestinationId = null;
+        saveData();
+        renderHighLevelView();
+    }
+
+    function addFlightOption(destId) {
+        const dest = database.destinations.find(d => d.id === destId);
+        dest.flightOptions.push({ id: `f-${Date.now()}` });
+        saveData();
+        renderHighLevelView();
+    }
+    
+    function addHotelOption(destId) {
+        const dest = database.destinations.find(d => d.id === destId);
+        dest.hotelOptions.push({ id: `h-${Date.now()}` });
+        saveData();
+        renderHighLevelView();
+    }
+
+    function addActivityOption(destId) {
+        const dest = database.destinations.find(d => d.id === destId);
+        if (!dest.activityOptions) dest.activityOptions = [];
+        dest.activityOptions.push({ id: `a-${Date.now()}` });
+        saveData();
+        renderHighLevelView();
+    }
+    
+    function updateCost(event, destId, optionId, sourceType, itemType) {
+        const row = event.target.closest('tr');
+        const totalInput = row.querySelector('.total-cost');
+        const personInput = row.querySelector('.person-cost');
+        let totalCost = 0;
+        const numPeople = database.numberOfPeople;
+
+        if (sourceType === 'total') {
+            const totalVal = parseFloat(totalInput.value);
+            if (!isNaN(totalVal)) {
+                personInput.value = (totalVal / numPeople).toFixed(2);
+                totalCost = totalVal;
+            } else { personInput.value = ''; }
+        } else {
+            const personVal = parseFloat(personInput.value);
+            if (!isNaN(personVal)) {
+                totalInput.value = (personVal * numPeople).toFixed(2);
+                totalCost = personVal * numPeople;
+            } else { totalInput.value = ''; }
+        }
+        
+        if (itemType === 'flight') updateFlightOption(destId, optionId, 'totalCost', totalCost);
+        if (itemType === 'activity') updateActivityOption(destId, optionId, 'totalCost', totalCost);
+    }
+    
+    function updateFlightOption(destId, optionId, key, value) {
+        const dest = database.destinations.find(d => d.id === destId);
+        const option = dest.flightOptions.find(o => o.id === optionId);
+        option[key] = (key === 'totalCost') ? parseFloat(value) || 0 : value;
+        saveData();
+        renderHighLevelView();
+    }
+
+    function updateHotelOption(destId, optionId, key, value) {
+        const dest = database.destinations.find(d => d.id === destId);
+        const option = dest.hotelOptions.find(o => o.id === optionId);
+        option[key] = (key === 'cost') ? parseFloat(value) || 0 : value;
+        saveData();
+        renderHighLevelView();
+    }
+
+    function updateActivityOption(destId, optionId, key, value) {
+        const dest = database.destinations.find(d => d.id === destId);
+        if (!dest.activityOptions) dest.activityOptions = [];
+        const option = dest.activityOptions.find(o => o.id === optionId);
+        option[key] = (key === 'totalCost') ? parseFloat(value) || 0 : value;
+        saveData();
+        renderHighLevelView();
+    }
+
+    function deleteFlightOption(destId, optionId) {
+        const dest = database.destinations.find(d => d.id === destId);
+        dest.flightOptions = dest.flightOptions.filter(o => o.id !== optionId);
+        saveData();
+        renderHighLevelView();
+    }
+
+    function deleteHotelOption(destId, optionId) {
+        const dest = database.destinations.find(d => d.id === destId);
+        dest.hotelOptions = dest.hotelOptions.filter(o => o.id !== optionId);
+        saveData();
+        renderHighLevelView();
+    }
+
+    function deleteActivityOption(destId, optionId) {
+        const dest = database.destinations.find(d => d.id === destId);
+        dest.activityOptions = dest.activityOptions.filter(o => o.id !== optionId);
+        saveData();
+        renderHighLevelView();
+    }
+    </script>
+</body>
+</html>
