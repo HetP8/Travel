@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Holiday Vibe (Warm Off-White, Forest Green, Soft Grays) -->
     <!-- Application Structure Plan: A single-page application using a toggle pattern for each destination card. Data is now powered by Firebase Firestore for real-time collaboration. A central Planner ID system allows users to create or join a shared plan. -->
-    <!-- Visualization & Content Choices: Report Info: Data Persistence -> Goal: Enable real-time collaboration -> Viz/Presentation: Firebase Firestore integration -> Interaction: Replaced localStorage with onSnapshot listeners and setDoc operations. Data changes from any client are automatically pushed to all other clients without a refresh. -> Justification: This is the standard and most effective way to build the collaborative, multi-device experience the user requested. It solves the core problem of data being siloed in localStorage. -->
+    <!-- Visualization & Content Choices: Report Info: Mobile UI Clutter -> Goal: Improve mobile usability -> Viz/Presentation: Responsive table headers -> Interaction: Used Tailwind's responsive classes to hide header text on small screens, keeping only icons. -> Justification: This directly addresses the user's screenshot showing a cluttered mobile view, creating more horizontal space and a cleaner layout on phones. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
@@ -68,7 +68,6 @@
 
         <main class="container mx-auto p-4 sm:p-6 lg:p-8">
              <div id="plan-manager" class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                <!-- Initial State: Create or Join -->
                 <div id="initial-view">
                     <h3 class="font-bold text-center mb-4">Welcome to your collaborative planner!</h3>
                     <div class="flex flex-col sm:flex-row gap-4">
@@ -79,7 +78,6 @@
                         </div>
                     </div>
                 </div>
-                 <!-- Active Plan State -->
                 <div id="active-plan-view" class="hidden">
                     <div class="flex flex-col sm:flex-row items-center justify-center sm:space-x-4 space-y-2 sm:space-y-0">
                         <div class="flex items-center space-x-3">
@@ -88,7 +86,7 @@
                         </div>
                         <div class="flex items-center space-x-2 bg-slate-100 p-2 rounded-lg">
                              <span class="text-sm font-semibold text-slate-600">Planner ID:</span>
-                             <input type="text" id="active-plan-id" readonly class="bg-transparent font-mono text-sm">
+                             <input type="text" id="active-plan-id" readonly class="bg-transparent font-mono text-sm w-24">
                              <button onclick="copyPlanId()" class="text-slate-500 hover:text-slate-800" title="Copy ID">📋</button>
                         </div>
                         <button onclick="leavePlan()" class="text-sm text-red-600 hover:underline">Leave Plan</button>
@@ -114,20 +112,20 @@
     <template id="destination-card-template">
         <div class="destination-card bg-white rounded-lg shadow-sm border border-slate-200 transition-shadow hover:shadow-md">
             <div class="p-4 flex items-center justify-between">
-                <div><h3 class="font-bold text-lg text-slate-800 flex items-center" data-element="name"></h3><p class="text-sm text-slate-500" data-element="cost-summary"></p></div>
+                <div><h3 class="font-bold text-lg text-slate-800 flex items-center" data-element="name"></h3><div class="text-sm text-slate-500 flex flex-wrap gap-x-2" data-element="cost-summary"></div></div>
                 <div class="flex items-center space-x-2"><p class="font-bold text-xl text-green-700" data-element="total-cost"></p><button data-action="delete" class="btn-danger p-2 rounded-md transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div>
             </div>
             <div class="border-t border-slate-200 p-4">
                 <div data-section="summary" class="view-section"><div data-container="summary-view"></div><button data-action="toggle-view" class="mt-4 w-full btn-secondary font-semibold py-2 px-4 rounded-md text-sm transition-colors">✏️ Manage Details</button></div>
                 <div data-section="edit" class="view-section">
                     <h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>
-                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🛫 Departure</th><th class="px-2 py-2 font-semibold">🛬 Arrival</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="flights-body"></tbody></table></div>
+                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🛫<span class="hidden sm:inline"> Departure</span></th><th class="px-2 py-2 font-semibold">🛬<span class="hidden sm:inline"> Arrival</span></th><th class="px-2 py-2 font-semibold">💰<span class="hidden sm:inline"> Total (£)</span></th><th class="px-2 py-2 font-semibold">👤<span class="hidden sm:inline"> p/p (£)</span></th><th class="px-2 py-2 font-semibold">📝<span class="hidden sm:inline"> Notes</span></th><th class="px-2 py-2"></th></tr></thead><tbody data-container="flights-body"></tbody></table></div>
                     <button data-action="add-flight" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Flight</button>
                     <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>
-                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🏨 Hotel Name</th><th class="px-2 py-2 font-semibold">🗓️ Check-in</th><th class="px-2 py-2 font-semibold">🗓️ Check-out</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="hotels-body"></tbody></table></div>
+                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🏨<span class="hidden sm:inline"> Hotel Name</span></th><th class="px-2 py-2 font-semibold">🗓️<span class="hidden sm:inline"> Check-in</span></th><th class="px-2 py-2 font-semibold">🗓️<span class="hidden sm:inline"> Check-out</span></th><th class="px-2 py-2 font-semibold">💰<span class="hidden sm:inline"> Total (£)</span></th><th class="px-2 py-2 font-semibold">📝<span class="hidden sm:inline"> Notes</span></th><th class="px-2 py-2"></th></tr></thead><tbody data-container="hotels-body"></tbody></table></div>
                     <button data-action="add-hotel" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Hotel</button>
                     <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>
-                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🎟️ Item</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="activities-body"></tbody></table></div>
+                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🎟️<span class="hidden sm:inline"> Item</span></th><th class="px-2 py-2 font-semibold">💰<span class="hidden sm:inline"> Total (£)</span></th><th class="px-2 py-2 font-semibold">👤<span class="hidden sm:inline"> p/p (£)</span></th><th class="px-2 py-2 font-semibold">📝<span class="hidden sm:inline"> Notes</span></th><th class="px-2 py-2"></th></tr></thead><tbody data-container="activities-body"></tbody></table></div>
                     <button data-action="add-activity" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Item</button>
                     <button data-action="toggle-view" class="mt-8 w-full btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">✅ Done</button>
                 </div>
@@ -149,13 +147,21 @@
             numberOfPeople: 4,
         };
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = {
+    apiKey: "AIzaSyD0K2N336EehIi6hOXnjxGi2repw-YzqSQ",
+    authDomain: "het-travel.firebaseapp.com",
+    projectId: "het-travel",
+    storageBucket: "het-travel.firebasestorage.app",
+    messagingSenderId: "814273095592",
+    appId: "1:814273095592:web:f652fba371007b9603df9d",
+    measurementId: "G-M5BVPT81EW"
+        };    
+    const appId = firebaseConfig.het-travel;
 
         async function initializeFirebase() {
             if (Object.keys(firebaseConfig).length === 0) {
                 console.error("Firebase config is missing.");
-                document.getElementById('loading-state').textContent = 'Error: Firebase configuration is missing.';
+                document.getElementById('loading-state').textContent = 'Error: Firebase configuration is missing. Please follow the setup guide.';
                 return;
             }
             app = initializeApp(firebaseConfig);
@@ -339,8 +345,14 @@
                 
                 cardElement.querySelector('[data-element="name"]').textContent = dest.name;
                 cardElement.querySelector('[data-element="total-cost"]').textContent = `From £${totalCost.toLocaleString()}`;
-                cardElement.querySelector('[data-element="cost-summary"]').textContent = `✈️ ${flightPp} p/p | 🏨 ${hotelPp} p/p | 🎟️ ${activityPp} p/p`;
                 
+                const costSummary = cardElement.querySelector('[data-element="cost-summary"]');
+                costSummary.innerHTML = `
+                    <span class="whitespace-nowrap">✈️ ${flightPp} p/p</span>
+                    <span class="whitespace-nowrap">🏨 ${hotelPp} p/p</span>
+                    <span class="whitespace-nowrap">🎟️ ${activityPp} p/p</span>
+                `;
+
                 cardElement.querySelector('[data-action="delete"]').addEventListener('click', () => deleteDestination(dest.id));
                 cardElement.querySelector('[data-action="add-flight"]').addEventListener('click', () => addFlightOption(dest.id));
                 cardElement.querySelector('[data-action="add-hotel"]').addEventListener('click', () => addHotelOption(dest.id));
