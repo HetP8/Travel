@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>H3t's Holiday Planner</title>
+    <title>Het's Holiday Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Holiday Vibe (Warm Off-White, Forest Green, Soft Grays) -->
-    <!-- Application Structure Plan: A single-page application using a toggle pattern for each destination card. Data is now powered by Firebase Firestore for real-time collaboration. The multi-plan system has been removed in favor of a single, hardcoded plan for simplicity. -->
-    <!-- Visualization & Content Choices: Report Info: Mobile UI Clutter -> Goal: Improve mobile usability -> Viz/Presentation: Converted table rows into vertical cards on mobile screens. -> Interaction: Used responsive Tailwind classes (`block sm:table-row`, `sm:hidden`, etc.) to transform the layout. -> Justification: This directly resolves the user's feedback. The layout is now fully responsive, offering an optimized vertical view on phones and a wide-table view on larger screens, eliminating the "clunky" feel. -->
+    <!-- Application Structure Plan: Re-architected to a multi-project system. An initial 'plan selection' view lists all projects from Firestore. Users can create a new plan with a name and password, or click an existing plan to enter a password for access. -->
+    <!-- Visualization & Content Choices: Report Info: Add multi-project capability with passwords. -> Goal: Allow users to manage separate, protected plans. -> Viz/Presentation: Created a new main menu view and modals for plan creation and password entry. -> Interaction: Replaced the single-plan logic with a system that lists all plans from a collection. Clicking a plan prompts for a password, which is checked against the value stored in the Firestore document before granting access. -> Justification: Directly implements user request for a more robust, multi-plan architecture with a simple access control mechanism. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
@@ -42,105 +42,90 @@
         .view-section { display: none; }
         .view-section.active { display: block; }
 
-        /* Styles for the vertical mobile layout */
         @media (max-width: 640px) {
-            .mobile-card {
-                display: block;
-                border-bottom: 1px solid #e5e7eb;
-                padding-bottom: 1rem;
-                margin-bottom: 1rem;
-            }
-            .mobile-card-cell {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding-top: 0.5rem;
-                padding-bottom: 0.5rem;
-            }
-            .mobile-card-cell .input-wrapper {
-                width: 60%;
-            }
-            .mobile-card-cell label {
-                font-weight: 500;
-                color: #4b5563;
-            }
+            .mobile-card { display: block; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; margin-bottom: 1rem; }
+            .mobile-card-cell { display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .mobile-card-cell .input-wrapper { width: 60%; }
+            .mobile-card-cell label.main-label { font-weight: 500; color: #4b5563; }
         }
     </style>
 </head>
 <body class="antialiased">
 
     <div id="app-container">
-        <header class="header-gradient backdrop-blur-sm shadow-sm sticky top-0 z-20">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <h1 class="text-lg sm:text-xl font-bold text-slate-800 truncate">Het's Holiday Planner ✈️</h1>
-                    <button id="add-destination-btn" onclick="openAddDestinationModal()" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">
-                        + Add Destination
-                    </button>
+        <!-- Main Planner View -->
+        <div id="main-planner-view" class="hidden">
+            <header class="header-gradient backdrop-blur-sm shadow-sm sticky top-0 z-20">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <button onclick="leavePlan()" class="text-sm text-slate-600 hover:text-slate-900">← All Plans</button>
+                        <h1 class="text-lg sm:text-xl font-bold text-slate-800 truncate" id="planner-title"></h1>
+                        <button onclick="openAddDestinationModal()" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">
+                            + Add Destination
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </header>
-
-        <main class="container mx-auto p-4 sm:p-6 lg:p-8">
-             <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center space-x-3">
-                <label for="number-of-people" class="font-semibold text-slate-700">🧑‍🤝‍🧑 People:</label>
-                <input type="number" id="number-of-people" min="1" value="4" class="table-input w-20 text-center font-bold">
-            </div>
-
-            <div id="planner-content">
+            </header>
+            <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+                <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center space-x-3">
+                    <label for="number-of-people" class="font-semibold text-slate-700">🧑‍🤝‍🧑 People:</label>
+                    <input type="number" id="number-of-people" min="1" class="table-input w-20 text-center font-bold">
+                </div>
                 <p id="no-destinations-message" class="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm">Your adventure awaits! Add a destination to start planning. 🧳</p>
                 <div id="destinations-list" class="space-y-4"></div>
-            </div>
-             <div id="loading-state" class="text-center text-slate-500 py-12">Loading Shared Plan...</div>
-        </main>
-    </div>
+            </main>
+        </div>
 
-    <div id="add-destination-modal" class="fixed inset-0 bg-black/30 z-50 items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div class="p-6"><h3 class="text-lg font-medium text-slate-900 mb-4">Add New Destination</h3><input type="text" id="new-destination-name" placeholder="e.g., Budapest, Hungary" class="w-full table-input"></div>
-            <div class="px-6 py-3 bg-slate-50 flex justify-end space-x-2"><button onclick="closeAddDestinationModal()" class="btn-secondary py-2 px-4 rounded-md text-sm font-semibold">Cancel</button><button onclick="addDestination()" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold">Save</button></div>
+        <!-- Plan Selection View -->
+        <div id="plan-selection-view">
+             <header class="header-gradient backdrop-blur-sm shadow-sm sticky top-0 z-20">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <h1 class="text-lg sm:text-xl font-bold text-slate-800">Het's Holiday Planner ✈️</h1>
+                         <button onclick="openCreatePlanModal()" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">
+                            + Create New Plan
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+                 <div id="plans-list-container">
+                     <p id="loading-state" class="text-center text-slate-500 py-12">Loading Plans...</p>
+                     <div id="plans-list" class="space-y-3"></div>
+                 </div>
+            </main>
         </div>
     </div>
     
+    <!-- Modals -->
+    <div id="create-plan-modal" class="fixed inset-0 bg-black/30 z-50 items-center justify-center p-4 hidden"><div class="bg-white rounded-lg shadow-xl w-full max-w-md"><div class="p-6 space-y-4"><h3 class="text-lg font-medium text-slate-900">Create New Holiday Plan</h3><div><label for="new-plan-name" class="text-sm font-medium text-slate-600">Plan Name</label><input type="text" id="new-plan-name" placeholder="e.g., Summer 2025 Trip" class="w-full table-input mt-1"></div><div><label for="new-plan-password" class="text-sm font-medium text-slate-600">Password</label><input type="password" id="new-plan-password" class="w-full table-input mt-1"><p class="text-xs text-slate-500 mt-1">⚠️ Use a simple, memorable password. Do not use a secure password you use elsewhere.</p></div></div><div class="px-6 py-3 bg-slate-50 flex justify-end space-x-2"><button onclick="closeCreatePlanModal()" class="btn-secondary py-2 px-4 rounded-md text-sm font-semibold">Cancel</button><button onclick="createNewPlan()" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold">Create</button></div></div></div>
+    <div id="password-prompt-modal" class="fixed inset-0 bg-black/30 z-50 items-center justify-center p-4 hidden"><div class="bg-white rounded-lg shadow-xl w-full max-w-md"><div class="p-6 space-y-4"><h3 class="text-lg font-medium text-slate-900" id="password-prompt-title">Enter Password</h3><input type="hidden" id="prompt-plan-id"><input type="hidden" id="prompt-plan-password"><input type="password" id="prompt-password-input" class="w-full table-input"><p id="password-error" class="text-xs text-red-500 hidden">Incorrect password. Please try again.</p></div><div class="px-6 py-3 bg-slate-50 flex justify-end space-x-2"><button onclick="closePasswordPromptModal()" class="btn-secondary py-2 px-4 rounded-md text-sm font-semibold">Cancel</button><button onclick="checkPassword()" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold">Unlock</button></div></div></div>
+    <div id="add-destination-modal" class="fixed inset-0 bg-black/30 z-50 items-center justify-center p-4 hidden"><div class="bg-white rounded-lg shadow-xl w-full max-w-md"><div class="p-6"><h3 class="text-lg font-medium text-slate-900 mb-4">Add New Destination</h3><input type="text" id="new-destination-name" placeholder="e.g., Budapest, Hungary" class="w-full table-input"></div><div class="px-6 py-3 bg-slate-50 flex justify-end space-x-2"><button onclick="closeAddDestinationModal()" class="btn-secondary py-2 px-4 rounded-md text-sm font-semibold">Cancel</button><button onclick="addDestination()" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold">Save</button></div></div></div>
+
     <template id="destination-card-template">
         <div class="destination-card bg-white rounded-lg shadow-sm border border-slate-200 transition-shadow hover:shadow-md">
-            <div class="p-4 flex items-center justify-between">
-                <div><h3 class="font-bold text-lg text-slate-800 flex items-center" data-element="name"></h3><div class="text-sm text-slate-500 flex flex-wrap gap-x-2" data-element="cost-summary"></div></div>
-                <div class="flex items-center space-x-2"><p class="font-bold text-xl text-green-700" data-element="total-cost"></p><button data-action="delete" class="btn-danger p-2 rounded-md transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div>
-            </div>
-            <div class="border-t border-slate-200 p-4">
-                <div data-section="summary" class="view-section"><div data-container="summary-view"></div><button data-action="toggle-view" class="mt-4 w-full btn-secondary font-semibold py-2 px-4 rounded-md text-sm transition-colors">✏️ Manage Details</button></div>
-                <div data-section="edit" class="view-section">
-                    <h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>
-                    <div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🛫 Departure</th><th class="px-2 py-2 font-semibold">🛬 Arrival</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="flights-body"></tbody></table></div></div>
-                    <button data-action="add-flight" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Flight</button>
-                    <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>
-                    <div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🏨 Hotel Name</th><th class="px-2 py-2 font-semibold">🗓️ Check-in</th><th class="px-2 py-2 font-semibold">🗓️ Check-out</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="hotels-body"></tbody></table></div></div>
-                    <button data-action="add-hotel" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Hotel</button>
-                    <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>
-                    <div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🎟️ Item</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="activities-body"></tbody></table></div></div>
-                    <button data-action="add-activity" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Item</button>
-                    <button data-action="toggle-view" class="mt-8 w-full btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">✅ Done</button>
-                </div>
-            </div>
+            <div class="p-4 flex items-center justify-between"><div><h3 class="font-bold text-lg text-slate-800 flex items-center" data-element="name"></h3><div class="text-sm text-slate-500 flex flex-wrap gap-x-2" data-element="cost-summary"></div></div><div class="flex items-center space-x-2"><p class="font-bold text-xl text-green-700" data-element="total-cost"></p><button data-action="delete" class="btn-danger p-2 rounded-md transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div></div>
+            <div class="border-t border-slate-200 p-4"><div data-section="summary" class="view-section"><div data-container="summary-view"></div><button data-action="toggle-view" class="mt-4 w-full btn-secondary font-semibold py-2 px-4 rounded-md text-sm transition-colors">✏️ Manage Details</button></div><div data-section="edit" class="view-section"><h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4><div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🛫 Departure</th><th class="px-2 py-2 font-semibold">🛬 Arrival</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="flights-body"></tbody></table></div></div><button data-action="add-flight" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Flight</button><h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4><div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🏨 Hotel Name</th><th class="px-2 py-2 font-semibold">🗓️ Check-in</th><th class="px-2 py-2 font-semibold">🗓️ Check-out</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="hotels-body"></tbody></table></div></div><button data-action="add-hotel" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Hotel</button><h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4><div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🎟️ Item</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="activities-body"></tbody></table></div></div><button data-action="add-activity" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Item</button><button data-action="toggle-view" class="mt-8 w-full btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">✅ Done</button></div></div>
         </div>
     </template>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, addDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         let app, auth, db;
         let unsubscribeFromPlan = null;
-        const mainPlannerId = 'main-holiday-plan'; // Hardcoded ID for the single plan
+        let currentPlannerId = null;
         let database = {
+            planName: 'New Plan',
+            password: '',
             destinations: [],
             editingDestinationId: null,
             numberOfPeople: 4,
         };
 
-const firebaseConfig = {
+    const firebaseConfig = {
     apiKey: "AIzaSyD0K2N336EehIi6hOXnjxGi2repw-YzqSQ",
     authDomain: "het-travel.firebaseapp.com",
     projectId: "het-travel",
@@ -148,8 +133,7 @@ const firebaseConfig = {
     messagingSenderId: "814273095592",
     appId: "1:814273095592:web:f652fba371007b9603df9d",
     measurementId: "G-M5BVPT81EW"
-  };
-
+        };
         const appId = firebaseConfig.projectId;
 
         async function initializeFirebase() {
@@ -157,11 +141,9 @@ const firebaseConfig = {
                 document.getElementById('loading-state').textContent = 'Error: Firebase configuration is missing. Please add your config keys to the HTML file.';
                 return;
             }
-            
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -169,46 +151,99 @@ const firebaseConfig = {
                     await signInAnonymously(auth);
                 }
                 console.log("Firebase Auth successful.");
-                loadSharedPlan();
+                loadAllPlans();
             } catch(error) {
                 console.error("Firebase Auth failed:", error);
                 document.getElementById('loading-state').textContent = 'Error: Could not authenticate.';
             }
         }
         
-        function loadSharedPlan() {
+        async function loadAllPlans() {
+            if (!db) return;
+            const plansRef = collection(db, `/artifacts/${appId}/public/data/holiday-planners`);
+            const q = query(plansRef);
+            try {
+                const querySnapshot = await getDocs(q);
+                const plansList = document.getElementById('plans-list');
+                plansList.innerHTML = '';
+                if (querySnapshot.empty) {
+                     document.getElementById('loading-state').textContent = 'No plans found. Create one to get started!';
+                } else {
+                    document.getElementById('loading-state').style.display = 'none';
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const plan = doc.data();
+                    const planEl = document.createElement('button');
+                    planEl.className = 'w-full text-left p-4 bg-white rounded-lg shadow-sm border border-slate-200 hover:bg-slate-50';
+                    planEl.innerHTML = `<h3 class="font-bold text-slate-800">${plan.planName}</h3><p class="text-sm text-slate-500">Created: ${new Date(plan.createdAt).toLocaleDateString()}</p>`;
+                    planEl.onclick = () => promptForPassword(doc.id, plan.planName, plan.password);
+                    plansList.appendChild(planEl);
+                });
+            } catch(error) {
+                console.error("Error fetching plans:", error);
+                document.getElementById('loading-state').textContent = 'Could not load plans.';
+            }
+        }
+
+        window.promptForPassword = function(planId, planName, storedPassword) {
+            const modal = document.getElementById('password-prompt-modal');
+            document.getElementById('password-prompt-title').textContent = `Enter Password for "${planName}"`;
+            document.getElementById('prompt-plan-id').value = planId;
+            document.getElementById('prompt-plan-password').value = storedPassword;
+            modal.style.display = 'flex';
+            document.getElementById('prompt-password-input').focus();
+        }
+
+        window.checkPassword = function() {
+            const enteredPassword = document.getElementById('prompt-password-input').value;
+            const storedPassword = document.getElementById('prompt-plan-password').value;
+            const planId = document.getElementById('prompt-plan-id').value;
+
+            if (enteredPassword === storedPassword) {
+                closePasswordPromptModal();
+                loadSpecificPlan(planId);
+            } else {
+                document.getElementById('password-error').style.display = 'block';
+            }
+        }
+
+        function loadSpecificPlan(planId) {
             if (unsubscribeFromPlan) unsubscribeFromPlan();
-
-            const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, mainPlannerId);
-
+            currentPlannerId = planId;
+            const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, planId);
             unsubscribeFromPlan = onSnapshot(planDocRef, (docSnap) => {
-                document.getElementById('loading-state').style.display = 'none';
-                document.getElementById('planner-content').style.display = 'block';
+                document.getElementById('plan-selection-view').style.display = 'none';
+                document.getElementById('main-planner-view').style.display = 'block';
 
                 if (docSnap.exists()) {
                     database = docSnap.data();
                     if(!database.destinations) database.destinations = [];
                     if(!database.numberOfPeople) database.numberOfPeople = 4;
-                    if(!database.activityOptions) database.activityOptions = [];
                     document.getElementById('number-of-people').value = database.numberOfPeople;
-                } else {
-                    saveDataToFirestore();
+                    document.getElementById('planner-title').textContent = database.planName;
                 }
                 renderHighLevelView();
             }, (error) => {
                 console.error("Error listening to plan:", error);
-                document.getElementById('loading-state').textContent = 'Error connecting to the planner.';
+                alert("Error connecting to the planner.");
             });
+        }
+        
+        window.leavePlan = function() {
+            if (unsubscribeFromPlan) unsubscribeFromPlan();
+            currentPlannerId = null;
+            document.getElementById('plan-selection-view').style.display = 'block';
+            document.getElementById('main-planner-view').style.display = 'none';
+            loadAllPlans();
         }
 
         async function saveDataToFirestore() {
-            if (!mainPlannerId || !db) return;
+            if (!currentPlannerId || !db) return;
             try {
-                const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, mainPlannerId);
+                const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, currentPlannerId);
                 await setDoc(planDocRef, database, { merge: true });
-            } catch (error) {
-                console.error("Error saving data to Firestore: ", error);
-            }
+            } catch (error) { console.error("Error saving data to Firestore: ", error); }
         }
         
         document.addEventListener('DOMContentLoaded', () => {
@@ -223,307 +258,83 @@ const firebaseConfig = {
             });
         });
 
-        function calculateTripDuration(startDateStr, endDateStr) {
-            if (!startDateStr || !endDateStr) return '';
-            const start = new Date(startDateStr);
-            const end = new Date(endDateStr);
-            if (isNaN(start) || isNaN(end) || end < start) return '';
-            const diffTime = Math.abs(end - start);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-            const nights = diffDays;
-            const days = nights + 1;
-            return `(${nights} night${nights !== 1 ? 's' : ''}, ${days} day${days !== 1 ? 's' : ''})`;
-        }
-
-        function getMinCosts(destination) {
-            const minFlightCost = destination.flightOptions.length > 0 ? Math.min(...destination.flightOptions.map(f => f.totalCost || Infinity)) : 0;
-            const minHotelCost = destination.hotelOptions.length > 0 ? Math.min(...destination.hotelOptions.map(h => h.cost || Infinity)) : 0;
-            const minActivityCost = destination.activityOptions && destination.activityOptions.length > 0 ? Math.min(...destination.activityOptions.map(a => a.totalCost || Infinity)) : 0;
-            return { 
-                minFlightCost: isFinite(minFlightCost) ? minFlightCost : 0, 
-                minHotelCost: isFinite(minHotelCost) ? minHotelCost : 0,
-                minActivityCost: isFinite(minActivityCost) ? minActivityCost : 0
-            };
-        }
-        
+        // Other functions (render views, updates, etc.) remain mostly the same
+        function calculateTripDuration(startDateStr, endDateStr) { if (!startDateStr || !endDateStr) return ''; const start = new Date(startDateStr); const end = new Date(endDateStr); if (isNaN(start) || isNaN(end) || end < start) return ''; const diffTime = Math.abs(end - start); const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); const nights = diffDays; const days = nights + 1; return `(${nights} night${nights !== 1 ? 's' : ''}, ${days} day${days !== 1 ? 's' : ''})`; }
+        function getMinCosts(destination) { const minFlightCost = destination.flightOptions.length > 0 ? Math.min(...destination.flightOptions.map(f => f.totalCost || Infinity)) : 0; const minHotelCost = destination.hotelOptions.length > 0 ? Math.min(...destination.hotelOptions.map(h => h.cost || Infinity)) : 0; const minActivityCost = destination.activityOptions && destination.activityOptions.length > 0 ? Math.min(...destination.activityOptions.map(a => a.totalCost || Infinity)) : 0; return {  minFlightCost: isFinite(minFlightCost) ? minFlightCost : 0,  minHotelCost: isFinite(minHotelCost) ? minHotelCost : 0, minActivityCost: isFinite(minActivityCost) ? minActivityCost : 0 }; }
         function renderHighLevelView() {
             const listContainer = document.getElementById('destinations-list');
             const noDestinationsMessage = document.getElementById('no-destinations-message');
             listContainer.innerHTML = '';
-            
-            if (!database.destinations || database.destinations.length === 0) {
-                noDestinationsMessage.style.display = 'block';
-                return;
-            }
+            if (!database.destinations || database.destinations.length === 0) { noDestinationsMessage.style.display = 'block'; return; }
             noDestinationsMessage.style.display = 'none';
-
-            const sortedDestinations = [...database.destinations].map(dest => {
-                const { minFlightCost, minHotelCost, minActivityCost } = getMinCosts(dest);
-                return { ...dest, totalCost: minFlightCost + minHotelCost + minActivityCost };
-            }).sort((a, b) => a.totalCost - b.totalCost);
-
+            const sortedDestinations = [...database.destinations].map(dest => { const { minFlightCost, minHotelCost, minActivityCost } = getMinCosts(dest); return { ...dest, totalCost: minFlightCost + minHotelCost + minActivityCost }; }).sort((a, b) => a.totalCost - b.totalCost);
             sortedDestinations.forEach(dest => {
                 const card = document.getElementById('destination-card-template').content.cloneNode(true);
                 const cardElement = card.firstElementChild;
                 cardElement.dataset.id = dest.id;
-
                 const { minFlightCost, minHotelCost, minActivityCost } = getMinCosts(dest);
                 const totalCost = minFlightCost + minHotelCost + minActivityCost;
-                
                 const numPeople = database.numberOfPeople;
                 const flightPp = minFlightCost > 0 ? `£${(minFlightCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '£0';
                 const hotelPp = minHotelCost > 0 ? `£${(minHotelCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '£0';
                 const activityPp = minActivityCost > 0 ? `£${(minActivityCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '£0';
-                
                 cardElement.querySelector('[data-element="name"]').textContent = dest.name;
                 cardElement.querySelector('[data-element="total-cost"]').textContent = `From £${totalCost.toLocaleString()}`;
-                
                 const costSummary = cardElement.querySelector('[data-element="cost-summary"]');
-                costSummary.innerHTML = `
-                    <span class="whitespace-nowrap">✈️ ${flightPp} p/p</span>
-                    <span class="whitespace-nowrap">🏨 ${hotelPp} p/p</span>
-                    <span class="whitespace-nowrap">🎟️ ${activityPp} p/p</span>
-                `;
-
+                costSummary.innerHTML = `<span class="whitespace-nowrap">✈️ ${flightPp} p/p</span><span class="whitespace-nowrap">🏨 ${hotelPp} p/p</span><span class="whitespace-nowrap">🎟️ ${activityPp} p/p</span>`;
                 cardElement.querySelector('[data-action="delete"]').addEventListener('click', () => deleteDestination(dest.id));
                 cardElement.querySelector('[data-action="add-flight"]').addEventListener('click', () => addFlightOption(dest.id));
                 cardElement.querySelector('[data-action="add-hotel"]').addEventListener('click', () => addHotelOption(dest.id));
                 cardElement.querySelector('[data-action="add-activity"]').addEventListener('click', () => addActivityOption(dest.id));
                 cardElement.querySelectorAll('[data-action="toggle-view"]').forEach(btn => btn.addEventListener('click', () => toggleEditView(dest.id)));
-                
                 renderSummaryView(dest, cardElement);
                 renderFlightOptions(dest, cardElement);
                 renderHotelOptions(dest, cardElement);
                 renderActivityOptions(dest, cardElement);
-
                 const summaryView = cardElement.querySelector('[data-section="summary"]');
                 const editView = cardElement.querySelector('[data-section="edit"]');
-                if(database.editingDestinationId === dest.id) {
-                    summaryView.classList.remove('active');
-                    editView.classList.add('active');
-                } else {
-                    summaryView.classList.add('active');
-                    editView.classList.remove('active');
-                }
-
+                if(database.editingDestinationId === dest.id) { summaryView.classList.remove('active'); editView.classList.add('active'); } else { summaryView.classList.add('active'); editView.classList.remove('active'); }
                 listContainer.appendChild(card);
             });
         }
-
         window.renderSummaryView = renderSummaryView;
-        function renderSummaryView(destination, cardElement) {
-            const container = cardElement.querySelector('[data-container="summary-view"]');
-            container.innerHTML = '';
-            const numPeople = database.numberOfPeople;
-
-            let html = '<h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>';
-            if (destination.flightOptions.length > 0) {
-                html += '<div class="space-y-3">';
-                destination.flightOptions.forEach(opt => {
-                    const depDate = opt.departureDate ? new Date(opt.departureDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A';
-                    const arrDate = opt.arrivalDate ? new Date(opt.arrivalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A';
-                    const duration = calculateTripDuration(opt.departureDate, opt.arrivalDate);
-                    const depTime = opt.departureTime || '';
-                    const arrTime = opt.arrivalTime || '';
-                    const totalCost = opt.totalCost ? `£${opt.totalCost.toLocaleString()} total` : '';
-                    const personCost = opt.totalCost ? `(£${(opt.totalCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})} p/p)` : '';
-                    html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${depDate} ${depTime} → ${arrDate} ${arrTime} <span class="font-normal text-slate-500">${duration}</span></p><p class="text-green-700 font-medium">${totalCost} ${personCost}</p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`;
-                });
-                html += '</div>';
-            } else { html += '<p class="text-sm text-slate-400">No flight options added.</p>'; }
-
-            html += '<h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>';
-            if (destination.hotelOptions.length > 0) {
-                html += '<div class="space-y-3">';
-                destination.hotelOptions.forEach(opt => {
-                    const checkIn = opt.checkInDate ? new Date(opt.checkInDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
-                    const checkOut = opt.checkOutDate ? new Date(opt.checkOutDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
-                    const hotelDates = checkIn && checkOut ? `${checkIn} → ${checkOut}` : '';
-                    html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${opt.name || 'Unnamed Hotel'}</p><p class="text-green-700 font-medium">${opt.cost ? `£${opt.cost.toLocaleString()}`: ''} <span class="font-normal text-slate-500">${hotelDates ? `(${hotelDates})` : ''}</span></p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`;
-                });
-                html += '</div>';
-            } else { html += '<p class="text-sm text-slate-400">No hotel options added.</p>';}
-
-            html += '<h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>';
-            if (destination.activityOptions && destination.activityOptions.length > 0) {
-                html += '<div class="space-y-3">';
-                destination.activityOptions.forEach(opt => {
-                    const totalCost = opt.totalCost ? `£${opt.totalCost.toLocaleString()} total` : '';
-                    const personCost = opt.totalCost ? `(£${(opt.totalCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})} p/p)` : '';
-                    html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${opt.name || 'Unnamed Activity'}</p><p class="text-green-700 font-medium">${totalCost} ${personCost}</p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`;
-                });
-                html += '</div>';
-            } else { html += '<p class="text-sm text-slate-400">No items added.</p>'; }
-
-            container.innerHTML = html;
-        }
-
+        function renderSummaryView(destination, cardElement) { const container = cardElement.querySelector('[data-container="summary-view"]'); container.innerHTML = ''; const numPeople = database.numberOfPeople; let html = '<h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>'; if (destination.flightOptions.length > 0) { html += '<div class="space-y-3">'; destination.flightOptions.forEach(opt => { const depDate = opt.departureDate ? new Date(opt.departureDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'; const arrDate = opt.arrivalDate ? new Date(opt.arrivalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'; const duration = calculateTripDuration(opt.departureDate, opt.arrivalDate); const depTime = opt.departureTime || ''; const arrTime = opt.arrivalTime || ''; const totalCost = opt.totalCost ? `£${opt.totalCost.toLocaleString()} total` : ''; const personCost = opt.totalCost ? `(£${(opt.totalCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})} p/p)` : ''; html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${depDate} ${depTime} → ${arrDate} ${arrTime} <span class="font-normal text-slate-500">${duration}</span></p><p class="text-green-700 font-medium">${totalCost} ${personCost}</p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`; }); html += '</div>'; } else { html += '<p class="text-sm text-slate-400">No flight options added.</p>'; } html += '<h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>'; if (destination.hotelOptions.length > 0) { html += '<div class="space-y-3">'; destination.hotelOptions.forEach(opt => { const checkIn = opt.checkInDate ? new Date(opt.checkInDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''; const checkOut = opt.checkOutDate ? new Date(opt.checkOutDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''; const hotelDates = checkIn && checkOut ? `${checkIn} → ${checkOut}` : ''; html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${opt.name || 'Unnamed Hotel'}</p><p class="text-green-700 font-medium">${opt.cost ? `£${opt.cost.toLocaleString()}`: ''} <span class="font-normal text-slate-500">${hotelDates ? `(${hotelDates})` : ''}</span></p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`; }); html += '</div>'; } else { html += '<p class="text-sm text-slate-400">No hotel options added.</p>';} html += '<h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>'; if (destination.activityOptions && destination.activityOptions.length > 0) { html += '<div class="space-y-3">'; destination.activityOptions.forEach(opt => { const totalCost = opt.totalCost ? `£${opt.totalCost.toLocaleString()} total` : ''; const personCost = opt.totalCost ? `(£${(opt.totalCost / numPeople).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})} p/p)` : ''; html += `<div class="p-3 bg-slate-50 rounded-md text-sm"><p class="font-semibold text-slate-800">${opt.name || 'Unnamed Activity'}</p><p class="text-green-700 font-medium">${totalCost} ${personCost}</p>${opt.notes ? `<p class="text-xs text-slate-500 mt-1 italic">Note: ${opt.notes}</p>` : ''}</div>`; }); html += '</div>'; } else { html += '<p class="text-sm text-slate-400">No items added.</p>'; } container.innerHTML = html; }
         window.renderFlightOptions = renderFlightOptions;
-        function renderFlightOptions(destination, cardElement) {
-            const body = cardElement.querySelector('[data-container="flights-body"]');
-            body.innerHTML = '';
-            destination.flightOptions.forEach(option => {
-                const row = body.insertRow();
-                row.className = 'mobile-card sm:table-row';
-                const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : '';
-                row.innerHTML = `
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">🛫 Departure</label><div class="input-wrapper space-y-1"><input type="date" value="${option.departureDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureDate', this.value)" class="table-input text-xs"><input type="time" value="${option.departureTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureTime', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">🛬 Arrival</label><div class="input-wrapper space-y-1"><input type="date" value="${option.arrivalDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalDate', this.value)" class="table-input text-xs"><input type="time" value="${option.arrivalTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalTime', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">💰 Total (£)</label><div class="input-wrapper"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'flight')" class="table-input total-cost text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">👤 p/p (£)</label><div class="input-wrapper"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'flight')" class="table-input person-cost text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateFlightOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Airline, etc.">${option.notes || ''}</textarea></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">Action</label><button onclick="deleteFlightOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
-            });
-        }
-        
+        function renderFlightOptions(destination, cardElement) { const body = cardElement.querySelector('[data-container="flights-body"]'); body.innerHTML = ''; destination.flightOptions.forEach(option => { const row = body.insertRow(); row.className = 'mobile-card sm:table-row'; const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : ''; row.innerHTML = `<td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">🛫 Departure</label><div class="input-wrapper"><label class="text-xs text-slate-500">Date</label><input type="date" value="${option.departureDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureDate', this.value)" class="table-input text-xs"><label class="text-xs text-slate-500 mt-1 block">Time</label><input type="time" value="${option.departureTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureTime', this.value)" class="table-input text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">🛬 Arrival</label><div class="input-wrapper"><label class="text-xs text-slate-500">Date</label><input type="date" value="${option.arrivalDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalDate', this.value)" class="table-input text-xs"><label class="text-xs text-slate-500 mt-1 block">Time</label><input type="time" value="${option.arrivalTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalTime', this.value)" class="table-input text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">💰 Total (£)</label><div class="input-wrapper"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'flight')" class="table-input total-cost text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">👤 p/p (£)</label><div class="input-wrapper"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'flight')" class="table-input person-cost text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateFlightOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Airline, etc.">${option.notes || ''}</textarea></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">Action</label><button onclick="deleteFlightOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`; }); }
         window.renderHotelOptions = renderHotelOptions;
-        function renderHotelOptions(destination, cardElement) {
-            const body = cardElement.querySelector('[data-container="hotels-body"]');
-            body.innerHTML = '';
-            destination.hotelOptions.forEach(option => {
-                const row = body.insertRow();
-                row.className = 'mobile-card sm:table-row';
-                row.innerHTML = `
-                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">🏨 Hotel Name</label><div class="input-wrapper"><input type="text" value="${option.name || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">🗓️ Check-in</label><div class="input-wrapper"><input type="date" value="${option.checkInDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkInDate', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">🗓️ Check-out</label><div class="input-wrapper"><input type="date" value="${option.checkOutDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkOutDate', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">💰 Total (£)</label><div class="input-wrapper"><input type="number" value="${option.cost || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'cost', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateHotelOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Booking link, etc.">${option.notes || ''}</textarea></div></td>
-                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">Action</label><button onclick="deleteHotelOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
-            });
-        }
-        
+        function renderHotelOptions(destination, cardElement) { const body = cardElement.querySelector('[data-container="hotels-body"]'); body.innerHTML = ''; destination.hotelOptions.forEach(option => { const row = body.insertRow(); row.className = 'mobile-card sm:table-row'; row.innerHTML = `<td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">🏨 Hotel Name</label><div class="input-wrapper"><input type="text" value="${option.name || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></div></td><td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">🗓️ Check-in</label><div class="input-wrapper"><label class="text-xs text-slate-500">Date</label><input type="date" value="${option.checkInDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkInDate', this.value)" class="table-input text-xs"></div></td><td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">🗓️ Check-out</label><div class="input-wrapper"><label class="text-xs text-slate-500">Date</label><input type="date" value="${option.checkOutDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkOutDate', this.value)" class="table-input text-xs"></div></td><td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">💰 Total (£)</label><div class="input-wrapper"><input type="number" value="${option.cost || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'cost', this.value)" class="table-input text-xs"></div></td><td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateHotelOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Booking link, etc.">${option.notes || ''}</textarea></div></td><td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">Action</label><button onclick="deleteHotelOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`; }); }
         window.renderActivityOptions = renderActivityOptions;
-        function renderActivityOptions(destination, cardElement) {
-            const body = cardElement.querySelector('[data-container="activities-body"]');
-            body.innerHTML = '';
-            if (!destination.activityOptions) destination.activityOptions = [];
-            destination.activityOptions.forEach(option => {
-                const row = body.insertRow();
-                row.className = 'mobile-card sm:table-row';
-                const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : '';
-                row.innerHTML = `
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">🎟️ Item</label><div class="input-wrapper"><input type="text" value="${option.name || ''}" onchange="updateActivityOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">💰 Total (£)</label><div class="input-wrapper"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'activity')" class="table-input total-cost text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">👤 p/p (£)</label><div class="input-wrapper"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'activity')" class="table-input person-cost text-xs"></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateActivityOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Details...">${option.notes || ''}</textarea></div></td>
-                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">Action</label><button onclick="deleteActivityOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
-            });
-        }
+        function renderActivityOptions(destination, cardElement) { const body = cardElement.querySelector('[data-container="activities-body"]'); body.innerHTML = ''; if (!destination.activityOptions) destination.activityOptions = []; destination.activityOptions.forEach(option => { const row = body.insertRow(); row.className = 'mobile-card sm:table-row'; const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : ''; row.innerHTML = `<td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">🎟️ Item</label><div class="input-wrapper"><input type="text" value="${option.name || ''}" onchange="updateActivityOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">💰 Total (£)</label><div class="input-wrapper"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'activity')" class="table-input total-cost text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">👤 p/p (£)</label><div class="input-wrapper"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'activity')" class="table-input person-cost text-xs"></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateActivityOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Details...">${option.notes || ''}</textarea></div></td><td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden main-label">Action</label><button onclick="deleteActivityOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`; }); }
         
-        window.toggleEditView = function(destId) {
-            database.editingDestinationId = (database.editingDestinationId === destId) ? null : destId;
-            saveDataToFirestore();
-        }
-
-        window.openAddDestinationModal = function() {
-            document.getElementById('add-destination-modal').style.display = 'flex';
-            document.getElementById('new-destination-name').focus();
-        }
-
-        window.closeAddDestinationModal = function() {
-            document.getElementById('add-destination-modal').style.display = 'none';
-            document.getElementById('new-destination-name').value = '';
-        }
-
-        window.addDestination = function() {
-            const name = document.getElementById('new-destination-name').value.trim();
-            if (!name) return;
-            database.destinations.push({ id: `dest-${Date.now()}`, name, flightOptions: [], hotelOptions: [], activityOptions: [] });
-            saveDataToFirestore();
-            closeAddDestinationModal();
-        }
+        window.toggleEditView = function(destId) { database.editingDestinationId = (database.editingDestinationId === destId) ? null : destId; saveDataToFirestore(); }
+        window.openCreatePlanModal = function() { document.getElementById('create-plan-modal').style.display = 'flex'; document.getElementById('new-plan-name').focus(); }
+        window.closeCreatePlanModal = function() { document.getElementById('create-plan-modal').style.display = 'none'; }
+        window.closePasswordPromptModal = function() { document.getElementById('password-prompt-modal').style.display = 'none'; document.getElementById('prompt-password-input').value = ''; document.getElementById('password-error').style.display = 'none';}
+        window.openAddDestinationModal = function() { document.getElementById('add-destination-modal').style.display = 'flex'; document.getElementById('new-destination-name').focus(); }
+        window.closeAddDestinationModal = function() { document.getElementById('add-destination-modal').style.display = 'none'; document.getElementById('new-destination-name').value = ''; }
         
-        window.deleteDestination = function(destinationId) {
-            if (!confirm('Are you sure you want to delete this destination and all its data?')) return;
-            database.destinations = database.destinations.filter(d => d.id !== destinationId);
-            if(database.editingDestinationId === destinationId) database.editingDestinationId = null;
-            saveDataToFirestore();
+        window.createNewPlan = async function() {
+            const planName = document.getElementById('new-plan-name').value.trim();
+            const password = document.getElementById('new-plan-password').value;
+            if (!planName || !password) { alert('Please enter both a plan name and a password.'); return; }
+            const newPlanData = { planName, password, destinations: [], editingDestinationId: null, numberOfPeople: 4, createdAt: new Date().toISOString() };
+            const newPlanRef = await addDoc(collection(db, `/artifacts/${appId}/public/data/holiday-planners`), newPlanData);
+            closeCreatePlanModal();
+            loadSpecificPlan(newPlanRef.id);
         }
 
-        window.addFlightOption = function(destId) {
-            const dest = database.destinations.find(d => d.id === destId);
-            dest.flightOptions.push({ id: `f-${Date.now()}` });
-            saveDataToFirestore();
-        }
-        
-        window.addHotelOption = function(destId) {
-            const dest = database.destinations.find(d => d.id === destId);
-            dest.hotelOptions.push({ id: `h-${Date.now()}` });
-            saveDataToFirestore();
-        }
-
-        window.addActivityOption = function(destId) {
-            const dest = database.destinations.find(d => d.id === destId);
-            if (!dest.activityOptions) dest.activityOptions = [];
-            dest.activityOptions.push({ id: `a-${Date.now()}` });
-            saveDataToFirestore();
-        }
-        
-        window.updateCost = function(event, destId, optionId, sourceType, itemType) {
-            const row = event.target.closest('tr, .mobile-card');
-            const totalInput = row.querySelector('.total-cost');
-            const personInput = row.querySelector('.person-cost');
-            let totalCost = 0;
-            const numPeople = database.numberOfPeople;
-
-            if (sourceType === 'total') {
-                const totalVal = parseFloat(totalInput.value);
-                if (!isNaN(totalVal)) {
-                    personInput.value = (totalVal / numPeople).toFixed(2);
-                    totalCost = totalVal;
-                } else { personInput.value = ''; }
-            } else {
-                const personVal = parseFloat(personInput.value);
-                if (!isNaN(personVal)) {
-                    totalInput.value = (personVal * numPeople).toFixed(2);
-                    totalCost = personVal * numPeople;
-                } else { totalInput.value = ''; }
-            }
-            
-            if (itemType === 'flight') updateFlightOption(destId, optionId, 'totalCost', totalCost);
-            if (itemType === 'activity') updateActivityOption(destId, optionId, 'totalCost', totalCost);
-        }
-        
-        window.updateFlightOption = function(destId, optionId, key, value) {
-            const dest = database.destinations.find(d => d.id === destId);
-            const option = dest.flightOptions.find(o => o.id === optionId);
-            option[key] = (key === 'totalCost') ? parseFloat(value) || 0 : value;
-            saveDataToFirestore();
-        }
-
-        window.updateHotelOption = function(destId, optionId, key, value) {
-            const dest = database.destinations.find(d => d.id === destId);
-            const option = dest.hotelOptions.find(o => o.id === optionId);
-            option[key] = (key === 'cost') ? parseFloat(value) || 0 : value;
-            saveDataToFirestore();
-        }
-
-        window.updateActivityOption = function(destId, optionId, key, value) {
-            const dest = database.destinations.find(d => d.id === destId);
-            if (!dest.activityOptions) dest.activityOptions = [];
-            const option = dest.activityOptions.find(o => o.id === optionId);
-            option[key] = (key === 'totalCost') ? parseFloat(value) || 0 : value;
-            saveDataToFirestore();
-        }
-
-        window.deleteFlightOption = function(destId, optionId) {
-            const dest = database.destinations.find(d => d.id === destId);
-            dest.flightOptions = dest.flightOptions.filter(o => o.id !== optionId);
-            saveDataToFirestore();
-        }
-
-        window.deleteHotelOption = function(destId, optionId) {
-            const dest = database.destinations.find(d => d.id === destId);
-            dest.hotelOptions = dest.hotelOptions.filter(o => o.id !== optionId);
-            saveDataToFirestore();
-        }
-
-        window.deleteActivityOption = function(destId, optionId) {
-            const dest = database.destinations.find(d => d.id === destId);
-            dest.activityOptions = dest.activityOptions.filter(o => o.id !== optionId);
-            saveDataToFirestore();
-        }
+        window.addDestination = function() { const name = document.getElementById('new-destination-name').value.trim(); if (!name) return; database.destinations.push({ id: `dest-${Date.now()}`, name, flightOptions: [], hotelOptions: [], activityOptions: [] }); saveDataToFirestore(); closeAddDestinationModal(); }
+        window.deleteDestination = async function(destinationId) { if (!confirm('Are you sure you want to delete this destination and all its data?')) return; database.destinations = database.destinations.filter(d => d.id !== destinationId); if(database.editingDestinationId === destinationId) database.editingDestinationId = null; saveDataToFirestore(); }
+        window.addFlightOption = function(destId) { const dest = database.destinations.find(d => d.id === destId); dest.flightOptions.push({ id: `f-${Date.now()}`, departureDate: '2025-06-01', arrivalDate: '2025-06-01' }); saveDataToFirestore(); }
+        window.addHotelOption = function(destId) { const dest = database.destinations.find(d => d.id === destId); dest.hotelOptions.push({ id: `h-${Date.now()}`, checkInDate: '2025-06-01', checkOutDate: '2025-06-01' }); saveDataToFirestore(); }
+        window.addActivityOption = function(destId) { const dest = database.destinations.find(d => d.id === destId); if (!dest.activityOptions) dest.activityOptions = []; dest.activityOptions.push({ id: `a-${Date.now()}` }); saveDataToFirestore(); }
+        window.updateCost = function(event, destId, optionId, sourceType, itemType) { const row = event.target.closest('tr, .mobile-card'); const totalInput = row.querySelector('.total-cost'); const personInput = row.querySelector('.person-cost'); let totalCost = 0; const numPeople = database.numberOfPeople; if (sourceType === 'total') { const totalVal = parseFloat(totalInput.value); if (!isNaN(totalVal)) { personInput.value = (totalVal / numPeople).toFixed(2); totalCost = totalVal; } else { personInput.value = ''; } } else { const personVal = parseFloat(personInput.value); if (!isNaN(personVal)) { totalInput.value = (personVal * numPeople).toFixed(2); totalCost = personVal * numPeople; } else { totalInput.value = ''; } } if (itemType === 'flight') updateFlightOption(destId, optionId, 'totalCost', totalCost); if (itemType === 'activity') updateActivityOption(destId, optionId, 'totalCost', totalCost); }
+        window.updateFlightOption = function(destId, optionId, key, value) { const dest = database.destinations.find(d => d.id === destId); const option = dest.flightOptions.find(o => o.id === optionId); option[key] = (key === 'totalCost') ? parseFloat(value) || 0 : value; saveDataToFirestore(); }
+        window.updateHotelOption = function(destId, optionId, key, value) { const dest = database.destinations.find(d => d.id === destId); const option = dest.hotelOptions.find(o => o.id === optionId); option[key] = (key === 'cost') ? parseFloat(value) || 0 : value; saveDataToFirestore(); }
+        window.updateActivityOption = function(destId, optionId, key, value) { const dest = database.destinations.find(d => d.id === destId); if (!dest.activityOptions) dest.activityOptions = []; const option = dest.activityOptions.find(o => o.id === optionId); option[key] = (key === 'totalCost') ? parseFloat(value) || 0 : value; saveDataToFirestore(); }
+        window.deleteFlightOption = async function(destId, optionId) { const dest = database.destinations.find(d => d.id === destId); dest.flightOptions = dest.flightOptions.filter(o => o.id !== optionId); saveDataToFirestore(); }
+        window.deleteHotelOption = async function(destId, optionId) { const dest = database.destinations.find(d => d.id === destId); dest.hotelOptions = dest.hotelOptions.filter(o => o.id !== optionId); saveDataToFirestore(); }
+        window.deleteActivityOption = async function(destId, optionId) { const dest = database.destinations.find(d => d.id === destId); dest.activityOptions = dest.activityOptions.filter(o => o.id !== optionId); saveDataToFirestore(); }
     </script>
 </body>
 </html>
