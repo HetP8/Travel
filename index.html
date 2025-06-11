@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Het's Holiday Planner NEW</title>
+    <title>H3t's Holiday Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Holiday Vibe (Warm Off-White, Forest Green, Soft Grays) -->
-    <!-- Application Structure Plan: A single-page application using a toggle pattern for each destination card. Data is now powered by Firebase Firestore for real-time collaboration. A central Planner ID system allows users to create or join a shared plan. -->
-    <!-- Visualization & Content Choices: Report Info: Mobile UI Clutter -> Goal: Improve mobile usability -> Viz/Presentation: Responsive table headers -> Interaction: Used Tailwind's responsive classes to hide header text on small screens, keeping only icons. -> Justification: This directly addresses the user's screenshot showing a cluttered mobile view, creating more horizontal space and a cleaner layout on phones. -->
+    <!-- Application Structure Plan: A single-page application using a toggle pattern for each destination card. Data is now powered by Firebase Firestore for real-time collaboration. The multi-plan system has been removed in favor of a single, hardcoded plan for simplicity. -->
+    <!-- Visualization & Content Choices: Report Info: Mobile UI Clutter -> Goal: Improve mobile usability -> Viz/Presentation: Converted table rows into vertical cards on mobile screens. -> Interaction: Used responsive Tailwind classes (`block sm:table-row`, `sm:hidden`, etc.) to transform the layout. -> Justification: This directly resolves the user's feedback. The layout is now fully responsive, offering an optimized vertical view on phones and a wide-table view on larger screens, eliminating the "clunky" feel. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
@@ -41,13 +41,28 @@
         }
         .view-section { display: none; }
         .view-section.active { display: block; }
-        
-        @media (max-width: 768px) {
-            .table-responsive {
+
+        /* Styles for the vertical mobile layout */
+        @media (max-width: 640px) {
+            .mobile-card {
                 display: block;
-                width: 100%;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 1rem;
+                margin-bottom: 1rem;
+            }
+            .mobile-card-cell {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-top: 0.5rem;
+                padding-bottom: 0.5rem;
+            }
+            .mobile-card-cell .input-wrapper {
+                width: 60%;
+            }
+            .mobile-card-cell label {
+                font-weight: 500;
+                color: #4b5563;
             }
         }
     </style>
@@ -58,8 +73,8 @@
         <header class="header-gradient backdrop-blur-sm shadow-sm sticky top-0 z-20">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
-                    <h1 class="text-xl font-bold text-slate-800">Het's Holiday Planner ✈️</h1>
-                    <button id="add-destination-btn" onclick="openAddDestinationModal()" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md hidden">
+                    <h1 class="text-lg sm:text-xl font-bold text-slate-800 truncate">Het's Holiday Planner ✈️</h1>
+                    <button id="add-destination-btn" onclick="openAddDestinationModal()" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">
                         + Add Destination
                     </button>
                 </div>
@@ -67,38 +82,16 @@
         </header>
 
         <main class="container mx-auto p-4 sm:p-6 lg:p-8">
-             <div id="plan-manager" class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                <div id="initial-view">
-                    <h3 class="font-bold text-center mb-4">Welcome to your collaborative planner!</h3>
-                    <div class="flex flex-col sm:flex-row gap-4">
-                        <button onclick="createNewPlan()" class="flex-1 btn-primary font-semibold py-2 px-4 rounded-lg text-sm">Create New Plan</button>
-                        <div class="flex-1 flex items-center gap-2">
-                             <input type="text" id="join-plan-id" placeholder="Paste Planner ID to join" class="table-input flex-grow">
-                             <button onclick="joinPlan()" class="btn-secondary font-semibold py-2 px-4 rounded-lg text-sm">Join</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="active-plan-view" class="hidden">
-                    <div class="flex flex-col sm:flex-row items-center justify-center sm:space-x-4 space-y-2 sm:space-y-0">
-                        <div class="flex items-center space-x-3">
-                            <label for="number-of-people" class="font-semibold text-slate-700">🧑‍🤝‍🧑 People:</label>
-                            <input type="number" id="number-of-people" min="1" value="4" class="table-input w-20 text-center font-bold">
-                        </div>
-                        <div class="flex items-center space-x-2 bg-slate-100 p-2 rounded-lg">
-                             <span class="text-sm font-semibold text-slate-600">Planner ID:</span>
-                             <input type="text" id="active-plan-id" readonly class="bg-transparent font-mono text-sm w-24">
-                             <button onclick="copyPlanId()" class="text-slate-500 hover:text-slate-800" title="Copy ID">📋</button>
-                        </div>
-                        <button onclick="leavePlan()" class="text-sm text-red-600 hover:underline">Leave Plan</button>
-                    </div>
-                </div>
+             <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center space-x-3">
+                <label for="number-of-people" class="font-semibold text-slate-700">🧑‍🤝‍🧑 People:</label>
+                <input type="number" id="number-of-people" min="1" value="4" class="table-input w-20 text-center font-bold">
             </div>
 
-            <div id="planner-content" class="hidden">
+            <div id="planner-content">
                 <p id="no-destinations-message" class="text-center text-slate-500 py-12 bg-white rounded-lg shadow-sm">Your adventure awaits! Add a destination to start planning. 🧳</p>
                 <div id="destinations-list" class="space-y-4"></div>
             </div>
-             <div id="loading-state" class="text-center text-slate-500 py-12">Loading...</div>
+             <div id="loading-state" class="text-center text-slate-500 py-12">Loading Shared Plan...</div>
         </main>
     </div>
 
@@ -119,13 +112,13 @@
                 <div data-section="summary" class="view-section"><div data-container="summary-view"></div><button data-action="toggle-view" class="mt-4 w-full btn-secondary font-semibold py-2 px-4 rounded-md text-sm transition-colors">✏️ Manage Details</button></div>
                 <div data-section="edit" class="view-section">
                     <h4 class="font-bold text-md text-slate-700 mb-2">Flights</h4>
-                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🛫<span class="hidden sm:inline"> Departure</span></th><th class="px-2 py-2 font-semibold">🛬<span class="hidden sm:inline"> Arrival</span></th><th class="px-2 py-2 font-semibold">💰<span class="hidden sm:inline"> Total (£)</span></th><th class="px-2 py-2 font-semibold">👤<span class="hidden sm:inline"> p/p (£)</span></th><th class="px-2 py-2 font-semibold">📝<span class="hidden sm:inline"> Notes</span></th><th class="px-2 py-2"></th></tr></thead><tbody data-container="flights-body"></tbody></table></div>
+                    <div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🛫 Departure</th><th class="px-2 py-2 font-semibold">🛬 Arrival</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="flights-body"></tbody></table></div></div>
                     <button data-action="add-flight" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Flight</button>
                     <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Hotels</h4>
-                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🏨<span class="hidden sm:inline"> Hotel Name</span></th><th class="px-2 py-2 font-semibold">🗓️<span class="hidden sm:inline"> Check-in</span></th><th class="px-2 py-2 font-semibold">🗓️<span class="hidden sm:inline"> Check-out</span></th><th class="px-2 py-2 font-semibold">💰<span class="hidden sm:inline"> Total (£)</span></th><th class="px-2 py-2 font-semibold">📝<span class="hidden sm:inline"> Notes</span></th><th class="px-2 py-2"></th></tr></thead><tbody data-container="hotels-body"></tbody></table></div>
+                    <div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🏨 Hotel Name</th><th class="px-2 py-2 font-semibold">🗓️ Check-in</th><th class="px-2 py-2 font-semibold">🗓️ Check-out</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="hotels-body"></tbody></table></div></div>
                     <button data-action="add-hotel" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Hotel</button>
                     <h4 class="font-bold text-md text-slate-700 mt-6 mb-2">Activities / Transport / Other</h4>
-                    <div class="table-responsive border rounded-lg"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50"><tr><th class="px-2 py-2 font-semibold">🎟️<span class="hidden sm:inline"> Item</span></th><th class="px-2 py-2 font-semibold">💰<span class="hidden sm:inline"> Total (£)</span></th><th class="px-2 py-2 font-semibold">👤<span class="hidden sm:inline"> p/p (£)</span></th><th class="px-2 py-2 font-semibold">📝<span class="hidden sm:inline"> Notes</span></th><th class="px-2 py-2"></th></tr></thead><tbody data-container="activities-body"></tbody></table></div>
+                    <div class="border rounded-lg"><div class="table-responsive"><table class="w-full text-sm text-left text-slate-500"><thead class="text-xs text-slate-700 uppercase bg-slate-50 hidden sm:table-header-group"><tr><th class="px-2 py-2 font-semibold">🎟️ Item</th><th class="px-2 py-2 font-semibold">💰 Total (£)</th><th class="px-2 py-2 font-semibold">👤 p/p (£)</th><th class="px-2 py-2 font-semibold">📝 Notes</th><th class="px-2 py-2"></th></tr></thead><tbody data-container="activities-body"></tbody></table></div></div>
                     <button data-action="add-activity" class="mt-2 btn-secondary font-semibold py-1 px-3 rounded-md text-xs transition-colors w-full">+ Add Item</button>
                     <button data-action="toggle-view" class="mt-8 w-full btn-primary font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all hover:shadow-md">✅ Done</button>
                 </div>
@@ -136,18 +129,18 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         let app, auth, db;
         let unsubscribeFromPlan = null;
-        let currentPlannerId = null;
+        const mainPlannerId = 'main-holiday-plan'; // Hardcoded ID for the single plan
         let database = {
             destinations: [],
             editingDestinationId: null,
             numberOfPeople: 4,
         };
 
-        const firebaseConfig = {
+const firebaseConfig = {
     apiKey: "AIzaSyD0K2N336EehIi6hOXnjxGi2repw-YzqSQ",
     authDomain: "het-travel.firebaseapp.com",
     projectId: "het-travel",
@@ -155,15 +148,16 @@
     messagingSenderId: "814273095592",
     appId: "1:814273095592:web:f652fba371007b9603df9d",
     measurementId: "G-M5BVPT81EW"
-        };    
-    const appId = firebaseConfig.projectId;
+  };
+
+        const appId = firebaseConfig.projectId;
 
         async function initializeFirebase() {
-            if (Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase config is missing.");
-                document.getElementById('loading-state').textContent = 'Error: Firebase configuration is missing. Please follow the setup guide.';
+             if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                document.getElementById('loading-state').textContent = 'Error: Firebase configuration is missing. Please add your config keys to the HTML file.';
                 return;
             }
+            
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
@@ -174,105 +168,43 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-                console.log("Firebase Auth successful. User UID:", auth.currentUser.uid);
-                checkLocalStorageForPlan();
+                console.log("Firebase Auth successful.");
+                loadSharedPlan();
             } catch(error) {
                 console.error("Firebase Auth failed:", error);
                 document.getElementById('loading-state').textContent = 'Error: Could not authenticate.';
             }
         }
-
-        function checkLocalStorageForPlan() {
-            const storedPlannerId = localStorage.getItem('holidayPlannerId');
-            if (storedPlannerId) {
-                joinPlan(storedPlannerId);
-            } else {
-                showView('initial-view');
-            }
-        }
         
-        window.createNewPlan = async function() {
-            showView('loading-state');
-            const newPlanRef = await addDoc(collection(db, `/artifacts/${appId}/public/data/holiday-planners`), {
-                ...database,
-                createdAt: new Date().toISOString()
-            });
-            localStorage.setItem('holidayPlannerId', newPlanRef.id);
-            joinPlan(newPlanRef.id);
-        }
+        function loadSharedPlan() {
+            if (unsubscribeFromPlan) unsubscribeFromPlan();
 
-        window.joinPlan = function(id = null) {
-            const plannerId = id || document.getElementById('join-plan-id').value.trim();
-            if (!plannerId) {
-                alert('Please enter a Planner ID.');
-                return;
-            }
-
-            if (unsubscribeFromPlan) {
-                unsubscribeFromPlan();
-            }
-
-            currentPlannerId = plannerId;
-            const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, currentPlannerId);
+            const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, mainPlannerId);
 
             unsubscribeFromPlan = onSnapshot(planDocRef, (docSnap) => {
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('planner-content').style.display = 'block';
+
                 if (docSnap.exists()) {
                     database = docSnap.data();
                     if(!database.destinations) database.destinations = [];
                     if(!database.numberOfPeople) database.numberOfPeople = 4;
                     if(!database.activityOptions) database.activityOptions = [];
-                    localStorage.setItem('holidayPlannerId', currentPlannerId);
                     document.getElementById('number-of-people').value = database.numberOfPeople;
-                    showView('active-plan-view');
-                    document.getElementById('planner-content').style.display = 'block';
-                    document.getElementById('active-plan-id').value = currentPlannerId;
-                    document.getElementById('add-destination-btn').style.display = 'block';
-                    renderHighLevelView();
                 } else {
-                    alert("Planner ID not found. Please check the ID and try again.");
-                    localStorage.removeItem('holidayPlannerId');
-                    showView('initial-view');
+                    saveDataToFirestore();
                 }
+                renderHighLevelView();
             }, (error) => {
                 console.error("Error listening to plan:", error);
-                alert("Error connecting to the planner.");
-                showView('initial-view');
+                document.getElementById('loading-state').textContent = 'Error connecting to the planner.';
             });
-        }
-        
-        window.leavePlan = function() {
-            if (unsubscribeFromPlan) unsubscribeFromPlan();
-            unsubscribeFromPlan = null;
-            currentPlannerId = null;
-            localStorage.removeItem('holidayPlannerId');
-            database.destinations = [];
-            database.editingDestinationId = null;
-            renderHighLevelView();
-            showView('initial-view');
-            document.getElementById('planner-content').style.display = 'none';
-        }
-
-        window.copyPlanId = function() {
-            const planIdInput = document.getElementById('active-plan-id');
-            planIdInput.select();
-            document.execCommand('copy');
-            alert('Planner ID copied to clipboard!');
-        }
-
-        function showView(view) {
-            document.getElementById('initial-view').style.display = 'none';
-            document.getElementById('active-plan-view').style.display = 'none';
-            document.getElementById('loading-state').style.display = 'none';
-
-            if(view === 'initial-view') document.getElementById('initial-view').style.display = 'block';
-            if(view === 'active-plan-view') document.getElementById('active-plan-view').style.display = 'block';
-            if(view === 'loading-state') document.getElementById('loading-state').style.display = 'block';
         }
 
         async function saveDataToFirestore() {
-            if (!currentPlannerId || !db) return;
+            if (!mainPlannerId || !db) return;
             try {
-                const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, currentPlannerId);
+                const planDocRef = doc(db, `/artifacts/${appId}/public/data/holiday-planners`, mainPlannerId);
                 await setDoc(planDocRef, database, { merge: true });
             } catch (error) {
                 console.error("Error saving data to Firestore: ", error);
@@ -432,8 +364,15 @@
             body.innerHTML = '';
             destination.flightOptions.forEach(option => {
                 const row = body.insertRow();
+                row.className = 'mobile-card sm:table-row';
                 const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : '';
-                row.innerHTML = `<td class="p-2 align-top"><div class="space-y-1"><input type="date" value="${option.departureDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureDate', this.value)" class="table-input text-xs"><input type="time" value="${option.departureTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureTime', this.value)" class="table-input text-xs"></div></td><td class="p-2 align-top"><div class="space-y-1"><input type="date" value="${option.arrivalDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalDate', this.value)" class="table-input text-xs"><input type="time" value="${option.arrivalTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalTime', this.value)" class="table-input text-xs"></div></td><td class="p-2 align-top"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'flight')" class="table-input total-cost text-xs"></td><td class="p-2 align-top"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'flight')" class="table-input person-cost text-xs"></td><td class="p-2 align-top"><textarea onchange="updateFlightOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Airline, etc.">${option.notes || ''}</textarea></td><td class="p-2 align-top"><button onclick="deleteFlightOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
+                row.innerHTML = `
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">🛫 Departure</label><div class="input-wrapper space-y-1"><input type="date" value="${option.departureDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureDate', this.value)" class="table-input text-xs"><input type="time" value="${option.departureTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'departureTime', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">🛬 Arrival</label><div class="input-wrapper space-y-1"><input type="date" value="${option.arrivalDate || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalDate', this.value)" class="table-input text-xs"><input type="time" value="${option.arrivalTime || ''}" onchange="updateFlightOption('${destination.id}', '${option.id}', 'arrivalTime', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">💰 Total (£)</label><div class="input-wrapper"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'flight')" class="table-input total-cost text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">👤 p/p (£)</label><div class="input-wrapper"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'flight')" class="table-input person-cost text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateFlightOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Airline, etc.">${option.notes || ''}</textarea></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">Action</label><button onclick="deleteFlightOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
             });
         }
         
@@ -443,7 +382,14 @@
             body.innerHTML = '';
             destination.hotelOptions.forEach(option => {
                 const row = body.insertRow();
-                row.innerHTML = `<td class="p-2"><input type="text" value="${option.name || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></td><td class="p-2"><input type="date" value="${option.checkInDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkInDate', this.value)" class="table-input text-xs"></td><td class="p-2"><input type="date" value="${option.checkOutDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkOutDate', this.value)" class="table-input text-xs"></td><td class="p-2"><input type="number" value="${option.cost || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'cost', this.value)" class="table-input text-xs"></td><td class="p-2"><textarea onchange="updateHotelOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Booking link, etc.">${option.notes || ''}</textarea></td><td class="p-2"><button onclick="deleteHotelOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
+                row.className = 'mobile-card sm:table-row';
+                row.innerHTML = `
+                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">🏨 Hotel Name</label><div class="input-wrapper"><input type="text" value="${option.name || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">🗓️ Check-in</label><div class="input-wrapper"><input type="date" value="${option.checkInDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkInDate', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">🗓️ Check-out</label><div class="input-wrapper"><input type="date" value="${option.checkOutDate || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'checkOutDate', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">💰 Total (£)</label><div class="input-wrapper"><input type="number" value="${option.cost || ''}" onchange="updateHotelOption('${destination.id}', '${option.id}', 'cost', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateHotelOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Booking link, etc.">${option.notes || ''}</textarea></div></td>
+                    <td class="p-2 sm:table-cell mobile-card-cell"><label class="sm:hidden">Action</label><button onclick="deleteHotelOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
             });
         }
         
@@ -454,8 +400,14 @@
             if (!destination.activityOptions) destination.activityOptions = [];
             destination.activityOptions.forEach(option => {
                 const row = body.insertRow();
+                row.className = 'mobile-card sm:table-row';
                 const perPersonCost = option.totalCost ? (option.totalCost / database.numberOfPeople).toFixed(2) : '';
-                row.innerHTML = `<td class="p-2"><input type="text" value="${option.name || ''}" onchange="updateActivityOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></td><td class="p-2 align-top"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'activity')" class="table-input total-cost text-xs"></td><td class="p-2 align-top"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'activity')" class="table-input person-cost text-xs"></td><td class="p-2 align-top"><textarea onchange="updateActivityOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Details...">${option.notes || ''}</textarea></td><td class="p-2 align-top"><button onclick="deleteActivityOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
+                row.innerHTML = `
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">🎟️ Item</label><div class="input-wrapper"><input type="text" value="${option.name || ''}" onchange="updateActivityOption('${destination.id}', '${option.id}', 'name', this.value)" class="table-input text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">💰 Total (£)</label><div class="input-wrapper"><input type="number" placeholder="Total" value="${option.totalCost || ''}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'total', 'activity')" class="table-input total-cost text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">👤 p/p (£)</label><div class="input-wrapper"><input type="number" placeholder="p/p" value="${perPersonCost}" onchange="updateCost(event, '${destination.id}', '${option.id}', 'person', 'activity')" class="table-input person-cost text-xs"></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">📝 Notes</label><div class="input-wrapper"><textarea onchange="updateActivityOption('${destination.id}', '${option.id}', 'notes', this.value)" class="table-input text-xs h-full" placeholder="Details...">${option.notes || ''}</textarea></div></td>
+                    <td class="p-2 align-top sm:table-cell mobile-card-cell"><label class="sm:hidden">Action</label><button onclick="deleteActivityOption('${destination.id}', '${option.id}')" class="btn-danger p-2 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>`;
             });
         }
         
@@ -509,7 +461,7 @@
         }
         
         window.updateCost = function(event, destId, optionId, sourceType, itemType) {
-            const row = event.target.closest('tr');
+            const row = event.target.closest('tr, .mobile-card');
             const totalInput = row.querySelector('.total-cost');
             const personInput = row.querySelector('.person-cost');
             let totalCost = 0;
